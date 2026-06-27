@@ -1,25 +1,33 @@
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import Webcam from 'react-webcam';
 
-const CameraView = ({ onFrameUpdate, isMuted = true }) => {
-  const webcamRef = useRef(null);
-  const canvasRef = useRef(null);
+interface CameraViewProps {
+  onFrameUpdate: (video: HTMLVideoElement, canvas: HTMLCanvasElement) => void;
+  isMuted?: boolean;
+}
+
+const CameraView: React.FC<CameraViewProps> = ({ onFrameUpdate, isMuted = true }) => {
+  const webcamRef = useRef<Webcam | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Fungsi internal untuk memicu inferensi frame per frame
   const handleVideoFrame = () => {
     if (
       webcamRef.current &&
+      webcamRef.current.video &&
       webcamRef.current.video.readyState === 4
     ) {
       const video = webcamRef.current.video;
       const canvas = canvasRef.current;
       
-      // Menyesuaikan ukuran canvas dengan video input
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      if (canvas) {
+        // Menyesuaikan ukuran canvas dengan video input
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-      // Mengirim objek video dan canvas ke fungsi pemrosesan utama
-      onFrameUpdate(video, canvas);
+        // Mengirim objek video dan canvas ke fungsi pemrosesan utama
+        onFrameUpdate(video, canvas);
+      }
     }
     
     // Melakukan loop rekursif untuk pemrosesan real-time

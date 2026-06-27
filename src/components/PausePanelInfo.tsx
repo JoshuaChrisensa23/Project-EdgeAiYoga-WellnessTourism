@@ -1,5 +1,21 @@
-// 
-function PausePanelInfo({ 
+import React from 'react';
+
+interface Repetitions {
+  Tree: number;
+  Mountain: number;
+  WarriorII: number;
+  Chair: number;
+}
+
+interface PausePanelInfoProps {
+  sessionPaused?: boolean;
+  avgFps?: number;
+  repetitions?: Repetitions;
+  onClose?: () => void;
+  onReset?: () => void;
+}
+
+const PausePanelInfo: React.FC<PausePanelInfoProps> = ({ 
   sessionPaused = true,
   avgFps = 53,
   repetitions = {
@@ -10,7 +26,7 @@ function PausePanelInfo({
   },
   onClose = () => {},
   onReset = () => {}
-}) {
+}) => {
   const totalReps = Object.values(repetitions).reduce((sum, val) => sum + val, 0);
 
   return (
@@ -121,6 +137,6 @@ function PausePanelInfo({
       </div>
     </div>
   );
-}
+};
 
 export default PausePanelInfo;

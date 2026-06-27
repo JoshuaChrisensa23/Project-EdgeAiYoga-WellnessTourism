@@ -12,12 +12,26 @@ export const JOINTS = {
   RIGHT_KNEE: 26,
   LEFT_ANKLE: 27,
   RIGHT_ANKLE: 28,
-};
+} as const;
+
+export type JointIndex = typeof JOINTS[keyof typeof JOINTS];
+
+export interface Point {
+  x: number;
+  y: number;
+  z?: number;
+  visibility?: number;
+  presence?: number;
+}
 
 /**
  * Menghitung sudut dalam θ berbasis Trigonometri Vektor (Persamaan 3, 4, 5 Jurnal)
  */
-export const calculateAngle = (pointA, pointB, pointC) => {
+export const calculateAngle = (
+  pointA: Point | undefined | null,
+  pointB: Point | undefined | null,
+  pointC: Point | undefined | null
+): number => {
   if (!pointA || !pointB || !pointC) return 0;
 
   // Persamaan (3): Vektor BA = (Xa - Xb, Ya - Yb)

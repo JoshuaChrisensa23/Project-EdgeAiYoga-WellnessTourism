@@ -15,7 +15,8 @@
     "dotenv": "^17.4.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-webcam": "^7.2.0"
+    "react-webcam": "^7.2.0",
+    "xstate": "^5.32.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -30,6 +31,7 @@
     "globals": "^17.6.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.1",
+    "typescript": "^6.0.3",
     "vite": "^8.0.12"
   }
 }

@@ -1,18 +1,24 @@
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 
-const ImageTestView = ({ onImageProcessed, externalImageSrc }) => {
-  const [imageSrc, setImageSrc] = useState(externalImageSrc || null);
-  const imageRef = useRef(null);
-  const canvasRef = useRef(null);
+interface ImageTestViewProps {
+  onImageProcessed: (image: HTMLImageElement, canvas: HTMLCanvasElement) => void;
+  externalImageSrc?: string | null;
+}
 
+const ImageTestView: React.FC<ImageTestViewProps> = ({ onImageProcessed, externalImageSrc }) => {
+  const [imageSrc, setImageSrc] = useState<string | null>(externalImageSrc || null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // 1. Menangani file gambar yang diunggah oleh pengguna
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImageSrc(e.target.result);
+        if (e.target?.result) {
+          setImageSrc(e.target.result as string);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -22,14 +28,18 @@ const ImageTestView = ({ onImageProcessed, externalImageSrc }) => {
   const handleImageLoad = () => {
     const image = imageRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    onImageProcessed(image, canvas);
+    if (image && canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        onImageProcessed(image, canvas);
+      }
+    }
   };
 
   return (

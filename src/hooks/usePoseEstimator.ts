@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 
 export const usePoseEstimator = () => {
-  const poseLandmarkerRef = useRef(null);
+  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
 
   useEffect(() => {
     const initTracker = async () => {
@@ -14,7 +14,8 @@ export const usePoseEstimator = () => {
         vision,
         {
           baseOptions: {
-            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
             delegate: "GPU",
           },
           runningMode: "IMAGE", // UBAH DARI "VIDEO" MENJADI "IMAGE" UNTUK TESTING GAMBAR
