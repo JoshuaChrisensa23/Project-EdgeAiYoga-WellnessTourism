@@ -27,10 +27,6 @@ interface Feedback {
   stateLabel: string;
 }
 
-interface User {
-  name: string;
-}
-
 function App() {
   const poseLandmarkerRef = usePoseEstimator();
   const [mode, setMode] = useState<"CAMERA" | "IMAGE">("CAMERA"); // "CAMERA" atau "IMAGE"
@@ -49,14 +45,6 @@ function App() {
   });
   const [isPoseValid, setIsPoseValid] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(true);
-  const [user, setUser] = useState<User | string | null>(() => {
-    try {
-      const stored = localStorage.getItem("yoga_logged_user");
-      return stored ? JSON.parse(stored) : null;
-    } catch (e: any) {
-      return e.message;
-    }
-  });
 
   const [feedback, setFeedback] = useState<Feedback>({
     status:
@@ -109,6 +97,7 @@ function App() {
     let activePoints: (Point | undefined | null)[] = [];
 
     if (selectedPose === "TREE") {
+      // 1. Ambil koordinat kedua belah kaki (Kiri dan Kanan)
       const leftHip = landmarks[JOINTS.LEFT_HIP];
       const leftKnee = landmarks[JOINTS.LEFT_KNEE];
       const leftAnkle = landmarks[JOINTS.LEFT_ANKLE];
@@ -117,11 +106,32 @@ function App() {
       const rightKnee = landmarks[JOINTS.RIGHT_KNEE];
       const rightAnkle = landmarks[JOINTS.RIGHT_ANKLE];
 
-      angle1 = calculateAngle(leftHip, leftKnee, leftAnkle); // Lutut kiri diangkat
-      angle2 = calculateAngle(rightHip, rightKnee, rightAnkle); // Kaki kanan tumpuan lurus
+      // 2. Hitung sudut matematis untuk masing-masing lutut
+      const leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+      const rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+
+      // 3. Tentukan kaki mana yang aktif ditekuk secara dinamis.
+      // Kaki yang ditekuk pasti memiliki sudut yang lebih kecil daripada kaki yang lurus lurus.
+      let activeKneeAngle, supportKneeAngle;
+
+      if (leftKneeAngle < rightKneeAngle) {
+        activeKneeAngle = leftKneeAngle;
+        supportKneeAngle = rightKneeAngle;
+      } else {
+        activeKneeAngle = rightKneeAngle;
+        supportKneeAngle = leftKneeAngle;
+      }
+
+      // Variabel utama yang dilempar ke panel UI akurasi (Fokus pada kaki yang ditekuk)
+      angle1 = activeKneeAngle;
+      angle2 = supportKneeAngle;
+
+      // Aturan Jurnal JUTIF: Kaki aktif <= 60° DAN Kaki tumpu lurus (170° - 180°)
       minTarget = 0;
       maxTarget = 60;
-      activePoints = [leftHip, leftKnee, leftAnkle];
+      activePoints = leftKneeAngle < rightKneeAngle
+        ? [leftHip, leftKnee, leftAnkle]
+        : [rightHip, rightKnee, rightAnkle];
     } else if (selectedPose === "WARRIOR_II") {
       const wrist = landmarks[JOINTS.RIGHT_WRIST];
       const shoulder = landmarks[JOINTS.RIGHT_SHOULDER];
@@ -141,12 +151,15 @@ function App() {
 
       angle1 = calculateAngle(shoulder, hip, groundVirtualPoint); // Sudut tulang belakang relatif terhadap lantai
       angle2 = 0;
-      minTarget = 30;
-      maxTarget = 55;
+      minTarget = 50;
+      maxTarget = 95;
       activePoints = [shoulder, hip, groundVirtualPoint];
     }
 
-    const accuracyScore = calculateAccuracy(angle1, minTarget, maxTarget);
+    let accuracyScore = calculateAccuracy(angle1, minTarget, maxTarget);
+    if (selectedPose === "TREE" && angle2 < 160 && accuracyScore === 100) {
+      accuracyScore = 75;
+    }
 
     // Kriteria validasi penuh berdasarkan aturan Jurnal JUTIF Anda
     let isValid = false;
@@ -155,7 +168,7 @@ function App() {
     } else if (selectedPose === "WARRIOR_II") {
       isValid = angle1 >= 80 && angle1 <= 105 && angle2 >= 170;
     } else if (selectedPose === "COBRA") {
-      isValid = angle1 >= 30 && angle1 <= 55;
+      isValid = angle1 >= 50 && angle1 <= 95;
     }
 
     // LOGIKA 3 STATE WARNA & KETERANGAN (EXCELLENT, GOOD, BAD)
@@ -459,7 +472,7 @@ function App() {
         return {
           title: "Cobra Pose",
           joints: "Tulang Belakang Kanan (Shoulder-Hip-Ground)",
-          target: "30° - 55°",
+          target: "50° - 95°",
         };
       default:
         return {
@@ -471,6 +484,8 @@ function App() {
   };
 
   const poseDetails = getPoseDetails();
+
+  const isModeCam = mode === "CAMERA";
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-6 flex flex-col items-center justify-center relative">
@@ -485,11 +500,6 @@ function App() {
         <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest font-semibold">
           Edge AI Client-Side System Evaluation (Statistical Mode)
         </p>
-        {user && (
-          <p className="text-emerald-400 text-sm font-semibold mt-3 bg-emerald-950/30 px-3 py-1 rounded-full border border-emerald-900/50 inline-block">
-            Selamat datang, {typeof user === "object" ? user.name : user}!
-          </p>
-        )}
 
         {/* TABS SELECTOR MODE (KAMERA VS GAMBAR) */}
         <div className="flex bg-gray-900/90 p-1.5 rounded-2xl border border-gray-800/80 mt-6 shadow-lg">
@@ -541,7 +551,7 @@ function App() {
             isPaused ? (
               <PausePanelInfo
                 sessionPaused={isPaused}
-                avgFps={53}
+                avgFps={60}
                 repetitions={repetitions}
                 onClose={() => setIsPaused(false)}
                 onReset={() => {
@@ -563,9 +573,13 @@ function App() {
                   htmlFor="pose-select-app"
                   className="text-sm font-medium text-gray-300"
                 >
-                  Pilih Target Pengujian Pose:
+                  Target Pengujian Pose :
                 </label>
-                <select
+                <span className="bg-gray-950 text-emerald-400 text-sm rounded-lg border border-gray-700 p-2">
+                  {poseDetails.title} ({poseDetails.joints}) -{" "}
+                  {poseDetails.target}
+                </span>
+                {/* <select
                   id="pose-select-app"
                   title="Pilih Target Pengujian Pose"
                   value={selectedPose}
@@ -580,6 +594,7 @@ function App() {
                       stateLabel: "",
                     });
                   }}
+                  disabled
                   className="bg-gray-950 text-emerald-400 text-sm rounded-lg border border-gray-700 p-2 cursor-pointer outline-none"
                 >
                   <option value="TREE">Tree Pose (Vertikal)</option>
@@ -587,7 +602,7 @@ function App() {
                     Warrior II Pose (Horizontal)
                   </option>
                   <option value="COBRA">Cobra Pose (Lantai)</option>
-                </select>
+                </select> */}
               </div>
               <ImageTestView onImageProcessed={handleImageProcessed} />
             </div>
@@ -596,146 +611,22 @@ function App() {
 
         {/* Panel Metrik & Feedback Kanan */}
         <div className="space-y-4 flex flex-col justify-start">
-          {mode === "CAMERA" ? (
-            /* Mode Kamera: Render original InfoPanel dari codebase */
-            <InfoPanel
-              metrics={metrics}
-              selectedPose={selectedPose}
-              setSelectedPose={setSelectedPose}
-              isPaused={isPaused}
-              setIsPaused={setIsPaused}
-              isMuted={isMuted}
-              setIsMuted={setIsMuted}
-              onFullScreen={handleFullScreen}
-              onLogout={() => {
-                localStorage.removeItem("yoga_logged_user");
-                setUser(null);
-              }}
-            />
-          ) : (
-            /* Mode Gambar: Info panel statis khusus JUTIF */
-            <div className="bg-gray-900/60 backdrop-blur-md p-6 rounded-2xl border border-gray-800/80 space-y-4">
-              <h2 className="text-lg font-bold text-gray-200 border-l-2 border-emerald-500 pl-3">
-                Matriks Evaluasi Gambar
-              </h2>
-              <div className="space-y-3">
-                <div className="bg-gray-950/70 p-4 rounded-xl border border-gray-800/80">
-                  <span className="text-xs text-gray-400 block mb-1">
-                    Sudut Utama (Primer)
-                  </span>
-                  <span className="text-3xl font-black text-emerald-400">
-                    {metrics.angle1}°
-                  </span>
-                </div>
-                {selectedPose !== "COBRA" && (
-                  <div className="bg-gray-950/70 p-4 rounded-xl border border-gray-800/80">
-                    <span className="text-xs text-gray-400 block mb-1">
-                      Sudut Sekunder
-                    </span>
-                    <span className="text-3xl font-black text-emerald-300">
-                      {metrics.angle2}°
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Panel State Akurasi Tambahan: EXCELLENT, GOOD, BAD, & Eksoskeleton Info */}
-          <div className="bg-gray-900/60 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-800/80 flex flex-col items-center space-y-5">
-            <h2 className="text-lg font-bold text-gray-200 self-start border-l-2 border-emerald-500 pl-3">
-              Akurasi & State Evaluasi
-            </h2>
-
-            {/* SVG Circular Progress Ring */}
-            <div className="relative w-36 h-36 flex items-center justify-center">
-              <div
-                className={`absolute inset-2 rounded-full transition-all duration-700 opacity-10 blur-lg ${
-                  metrics.accuracy === 100
-                    ? "bg-emerald-500"
-                    : metrics.accuracy >= 70
-                      ? "bg-amber-500"
-                      : metrics.accuracy > 0
-                        ? "bg-rose-500"
-                        : "bg-transparent"
-                }`}
-              />
-
-              <svg className="w-full h-full transform -rotate-90">
-                <circle
-                  cx="72"
-                  cy="72"
-                  r={radius}
-                  className="stroke-gray-950/80"
-                  strokeWidth="8"
-                  fill="transparent"
-                />
-                <circle
-                  cx="72"
-                  cy="72"
-                  r={radius}
-                  className={`transition-all duration-700 ease-out ${
-                    metrics.accuracy === 100
-                      ? "stroke-emerald-500"
-                      : metrics.accuracy >= 70
-                        ? "stroke-amber-500"
-                        : "stroke-rose-500"
-                  }`}
-                  strokeWidth="8"
-                  fill="transparent"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  strokeLinecap="round"
-                />
-              </svg>
-
-              <div className="absolute flex flex-col items-center justify-center text-center">
-                <span className="text-3xl font-black tracking-tight">
-                  {metrics.accuracy}%
-                </span>
-                <span className="text-[9px] text-gray-400 uppercase font-bold tracking-widest mt-0.5">
-                  Accuracy
-                </span>
-              </div>
-            </div>
-
-            {/* State Label Badge */}
-            {feedback.stateLabel && (
-              <div
-                className={`px-4 py-1.5 rounded-full text-xs font-black tracking-widest border transition-all duration-500 ${
-                  feedback.stateLabel === "EXCELLENT"
-                    ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/50"
-                    : feedback.stateLabel === "GOOD"
-                      ? "bg-amber-950/60 text-amber-400 border-amber-500/50"
-                      : "bg-rose-950/60 text-rose-400 border-rose-500/50"
-                }`}
-              >
-                {feedback.stateLabel}
-              </div>
-            )}
-
-            {/* Parameter Standar Info */}
-            <div className="w-full bg-gray-950/60 p-4 rounded-xl border border-gray-800/80 text-left">
-              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">
-                Target Geometri ({poseDetails.title})
-              </span>
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-xs font-semibold text-gray-300">
-                  {poseDetails.joints}
-                </span>
-                <span className="text-xs font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/60 whitespace-nowrap">
-                  {poseDetails.target}
-                </span>
-              </div>
-            </div>
-
-            {/* Feedback Status Box */}
-            <div
-              className={`p-4 w-full rounded-xl text-center font-bold text-xs leading-relaxed border transition-all duration-500 ${feedback.colorClass}`}
-            >
-              {feedback.status}
-            </div>
-          </div>
+          <InfoPanel
+            metrics={metrics}
+            radius={radius}
+            feedback={feedback}
+            circumference={circumference}
+            poseDetails={poseDetails}
+            strokeDashoffset={strokeDashoffset}
+            selectedPose={selectedPose}
+            setSelectedPose={setSelectedPose}
+            isModeCam={isModeCam}
+            isPaused={isPaused}
+            setIsPaused={setIsPaused}
+            isMuted={isMuted}
+            setIsMuted={setIsMuted}
+            onFullScreen={handleFullScreen}
+          />
         </div>
       </div>
     </div>
