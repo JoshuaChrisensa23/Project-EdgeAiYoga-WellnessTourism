@@ -64,3 +64,23 @@ export const calculateAngle = (
 
   return Math.round(degrees);
 };
+
+export const calculateAccuracy = (
+  currentAngle: number,
+  minTarget: number,
+  maxTarget: number,
+): number => {
+  if (currentAngle >= minTarget && currentAngle <= maxTarget) {
+    return 100;
+  }
+
+  const distance =
+    currentAngle < minTarget
+      ? minTarget - currentAngle
+      : currentAngle - maxTarget;
+
+  const maxTolerance = 45;
+
+  const accuracy = 100 - (distance / maxTolerance) * 100;
+  return Math.max(0, Math.round(accuracy));
+};
